@@ -1,0 +1,132 @@
+#Practice Machine Learning - Project
+##author: "Chun Lei He"
+##date: "June 8, 2016"
+##output: html_document
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+if (!require("kernlab")) install.packages("kernlab")
+if (!require("RANN")) install.packages("RANN")
+
+library(caret)
+library(ggplot2)
+library(lattice)
+library(kernlab)
+library(randomForest)
+```
+
+##Background
+
+###Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of 
+###data about personal activity relatively inexpensively. These type of devices are part of the quantified self 
+###movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, 
+###to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is 
+###quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+###In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 
+###6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+###More information is available from the website here: http://groupware.les.inf.puc-rio.br/har 
+###(see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+
+###The training data for this project are available here:
+
+###  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+###The test data are available here:
+
+###  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+##Load Data 
+
+```{r}
+setInternet2(TRUE)
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+pmltrain <- read.csv('pml-training.csv')
+pmltest <- read.csv('pml-testing.csv')
+
+```
+
+##Exploratory Data Analysis
+
+
+###Split training, test and validation sets
+```{r}
+trainidx <- createDataPartition(pmltrain$classe,p=.9,list=FALSE)
+traindata = pmltrain[trainidx,]
+validationdata = pmltrain[-trainidx,]
+set.seed(123456)
+
+```
+
+###Clean up near zero variance features, columns with missing values and descriptive fields.
+
+```{r}
+nzv <- nearZeroVar(traindata)
+trainnzv <- traindata[-nzv]
+validationnzv <- validationdata[-nzv]
+pmltestnzv <- pmltest[-nzv]
+
+
+ftridx <- which(lapply(trainnzv,class) %in% c('numeric'))
+trainnzv1 <- preProcess(trainnzv[,ftridx], method=c('knnImpute'))
+
+ftridx
+trainnzv1
+
+```
+
+###Created from 367 samples and 64 variables
+
+###Pre-processing:
+###- centered (64)
+###- ignored (0)
+###- 5 nearest neighbor imputation (64)
+###- scaled (64)
+
+```{r}
+pred1 <- predict(trainnzv1, trainnzv[,ftridx])
+predtrain <- cbind(trainnzv$classe,pred1)
+names(predtrain)[1] <- 'classe'
+predtrain[is.na(predtrain)] <- 0
+
+pred2 <- predict(trainnzv1, validationnzv[,ftridx])
+predvalidation <- cbind(validationnzv$classe, pred2)
+names(predvalidation)[1] <- 'classe'
+predvalidation[is.na(predvalidation)] <- 0
+
+predpmltest <- predict(trainnzv1,pmltestnzv[,ftridx] )
+
+```
+## Build the random Forest model, train it on the training set
+
+```{r}
+model <- randomForest(classe~.,data=predtrain)
+
+predtrain1 <- predict(model, predtrain) 
+print(table(predtrain1, predtrain$classe))
+
+training <- as.data.frame(table(predtrain1, predtrain$classe))
+
+```
+
+## Apply the model on the validation set
+```{r}
+predvalidation1 <- predict(model, predvalidation) 
+print(table(predvalidation1, predvalidation$classe))
+
+```
+## Apply the model on test set
+```{r}
+str(predpmltest)
+predanswers <- predict(model, predpmltest) 
+
+```
+
+## show the prediction results
+```{r}
+predanswers
+```
+
